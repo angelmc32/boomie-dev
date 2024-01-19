@@ -1,6 +1,6 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/types";
-import { Contract } from "ethers";
+// import { Contract } from "ethers";
 
 /**
  * Deploys a contract named "YourContract" using the deployer account and
@@ -22,10 +22,23 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   const { deployer } = await hre.getNamedAccounts();
   const { deploy } = hre.deployments;
 
-  await deploy("YourContract", {
+  console.log(deployer);
+
+  const multiplier = 10n ** 18n; // Again, 'n' is used for BigInt
+
+  await deploy("BoomieRamp", {
     from: deployer,
     // Contract constructor arguments
-    args: [deployer],
+    args: [
+      process.env.BURNER_WALLET_ADDRESS,
+      process.env.GHO_TOKEN_SEPOLIA,
+      25n * multiplier,
+      250n * multiplier,
+      86400, // 1 day in seconds
+      86400, // 1 day in seconds
+      5n * multiplier,
+      process.env.BURNER_WALLET_ADDRESS,
+    ],
     log: true,
     // autoMine: can be passed to the deploy function to make the deployment process faster on local networks by
     // automatically mining the contract deployment transaction. There is no effect on live networks.
@@ -33,12 +46,11 @@ const deployYourContract: DeployFunction = async function (hre: HardhatRuntimeEn
   });
 
   // Get the deployed contract to interact with it after deploying.
-  const yourContract = await hre.ethers.getContract<Contract>("YourContract", deployer);
-  console.log("👋 Initial greeting:", await yourContract.greeting());
+  // const yourContract = await hre.ethers.getContract<Contract>("BoomieRamp", deployer);
 };
 
 export default deployYourContract;
 
 // Tags are useful if you have multiple deploy files and only want to run one of them.
 // e.g. yarn deploy --tags YourContract
-deployYourContract.tags = ["YourContract"];
+deployYourContract.tags = ["BoomieRamp"];
