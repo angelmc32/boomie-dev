@@ -6,6 +6,7 @@ import "hardhat/console.sol";
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 
 import { Bytes32ArrayUtils } from "./external/Bytes32ArrayUtils.sol";
 import { Uint256ArrayUtils } from "./external/Uint256ArrayUtils.sol";
@@ -18,6 +19,7 @@ import { Uint256ArrayUtils } from "./external/Uint256ArrayUtils.sol";
 contract BoomieRamp is Ownable {
 	using Bytes32ArrayUtils for bytes32[];
 	using Uint256ArrayUtils for uint256[];
+    IPool private aavePool;
 
 	event AccountRegistered(
 		address indexed accountOwner,
@@ -163,7 +165,8 @@ contract BoomieRamp is Ownable {
 		uint256 _intentExpirationPeriod,
 		uint256 _onRampCooldownPeriod,
 		uint256 _sustainabilityFee,
-		address _sustainabilityFeeRecipient
+		address _sustainabilityFeeRecipient,
+        IPool _aavePool
 	) Ownable() {
 		gho = _gho;
 		minDepositAmount = _minDepositAmount;
@@ -172,11 +175,36 @@ contract BoomieRamp is Ownable {
 		onRampCooldownPeriod = _onRampCooldownPeriod;
 		sustainabilityFee = _sustainabilityFee;
 		sustainabilityFeeRecipient = _sustainabilityFeeRecipient;
+        aavePool = _aavePool;
 
 		transferOwnership(_owner);
 	}
 
 	/* ============ External Functions ============ */
+
+    /**
+	 * @notice Functions
+	 */
+    function supplyToAave(
+        address asset,
+        uint256 amount, 
+        address onBehalfOf,
+        uint16 referralCode
+    ) internal {
+        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+
+        IERC20(asset).approve(address(aavePool), amount);
+
+        aavePool.supply(asset,amount,onBehalfOf,referralCode);
+    }
+
+    function withdrawFromAave(
+        address asset, 
+        uint256 amount,
+        address to
+    ) internal {
+        uint256 amountWithdrawn = aavePool.withdraw(asset,amount,to);
+    }
 
 	/**
 	 * @notice Initialize Ramp with the addresses of the Processors
@@ -242,6 +270,7 @@ contract BoomieRamp is Ownable {
 		});
 
 		gho.transferFrom(msg.sender, address(this), _depositAmount);
+        supplyToAave(address(gho), _depositAmount, address(this), 0);
 
 		emit DepositReceived(
 			depositId,
@@ -446,6 +475,7 @@ contract BoomieRamp is Ownable {
 
 			_pruneIntents(deposit, prunableIntents);
 
+            withdrawFromAave(address(gho), deposit.remainingDeposits + reclaimableAmount, address(this));
 			returnAmount += deposit.remainingDeposits + reclaimableAmount;
 
 			deposit.outstandingIntentAmount -= reclaimableAmount;
